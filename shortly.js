@@ -2,6 +2,9 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var session = require('express-session');
+var bcrypt = require('bcrypt-nodejs');
+var Promise = require('bluebird');
 
 
 var db = require('./app/config');
@@ -22,27 +25,26 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-
 app.get('/', 
 function(req, res) {
-  res.render('index');
+  res.render('login');
 });
 
-app.get('/create', 
+app.get('/create',  //auth required
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links', 
+app.get('/links', //auth required
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links', 
+app.post('/links', //auth required
 function(req, res) {
-  var uri = req.body.url;
+  var uri = req.body.url; 
 
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
@@ -74,9 +76,46 @@ function(req, res) {
   });
 });
 
+
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+
+// app.post('/login', function(req, res){
+//   var username = request.body.username;
+//   var password = request.body.password;
+
+//   new User({username: username}).fetch().then(function(user){ //defining user instance with bookshelf/db
+//     if(!user){  //if user doesn't exist
+//       res.redirect('/login')  //route to login
+//     } else {
+//       var hash = user.get('password');
+
+//       bcrypt.compare(password, hash, function(match){ //if user does exist, check password
+//         if (match) {
+//           createSession(req, res, user){ //if match, start session
+//             // ...
+//           }
+//           res.redirect('/links');
+//         } else {
+//           res.redirect('/login'); // if password doesn't match, route to login
+//         }
+//       })
+//     }
+//   })
+// })
+
+app.get('/signup', 
+function(req, res) {
+  res.render('signup');
+});
+
+app.post('/signup', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+  new User(username, password);
+  res.render('signup');
+});
 
 
 
