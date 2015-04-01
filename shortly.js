@@ -25,26 +25,33 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-app.get('/', 
-function(req, res) {
-  res.render('login');
-});
+app.use(session({
+  secret: 'shhh it\'s a secret!',
+  resave: false,
+  saveUninitialized: true
+}));
 
-app.get('/create',  //auth required
+app.get('/', util.checkUser,
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links', //auth required
+app.get('/create', util.checkUser, //auth required
+function(req, res) {
+  res.render('index');
+});
+
+app.get('/links', util.checkUser,//auth required
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links', //auth required
+app.post('/links', util.checkUser, //auth required
 function(req, res) {
-  var uri = req.body.url; 
+  var uri = req.body.url;
+  console.log('**********URI: ', uri);
 
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
@@ -81,29 +88,31 @@ function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
-// app.post('/login', function(req, res){
-//   var username = request.body.username;
-//   var password = request.body.password;
+app.get('/login', 
+function(req, res) {
+  req.session.destroy(function(){
+    res.render('login');
+  })
+});
 
-//   new User({username: username}).fetch().then(function(user){ //defining user instance with bookshelf/db
-//     if(!user){  //if user doesn't exist
-//       res.redirect('/login')  //route to login
-//     } else {
-//       var hash = user.get('password');
+app.post('/login', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
 
-//       bcrypt.compare(password, hash, function(match){ //if user does exist, check password
-//         if (match) {
-//           createSession(req, res, user){ //if match, start session
-//             // ...
-//           }
-//           res.redirect('/links');
-//         } else {
-//           res.redirect('/login'); // if password doesn't match, route to login
-//         }
-//       })
-//     }
-//   })
-// })
+  new User({username: username}).fetch().then(function(user){ //defining user instance with bookshelf/db
+    if(!user){  //if user doesn't exist
+      res.redirect('/login');  //route to login
+    } else {
+      user.comparePassword(password, function(match) {
+        if (match) { //if user does exist, check password
+          util.createSession(req, res, user); //if match, start session
+        } else {
+          res.redirect('/login'); // if password doesn't match, route to login
+        }
+      })
+    }
+  });
+});
 
 app.get('/signup', 
 function(req, res) {
@@ -113,8 +122,21 @@ function(req, res) {
 app.post('/signup', function(req, res){
   var username = req.body.username;
   var password = req.body.password;
-  new User(username, password);
-  res.render('signup');
+
+  new User({username: username}).fetch().then(function(user){ 
+    if (!user) {  
+      var newUser = new User({
+        username: username,
+        password: password
+      });
+      newUser.save().then(function(newUser){
+        util.createSession(req, res, newUser);
+        Users.add(newUser);
+      })
+    } else {
+      res.redirect('/signup'); // if password doesn't match, route to login
+    }
+  });
 });
 
 
